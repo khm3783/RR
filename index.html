@@ -266,30 +266,37 @@
         const randomDelay = Math.floor(Math.random() * 1000) + 1000;
 
         setTimeout(() => {
-            if (currentIndex === 5) {
-                setScreenState("finish");
-            }
-
             currentIndex++;
 
-            if (chambers[currentIndex - 1]) {
-                playAudio('bang');
-                triggerScreenShake();
-                
-                setTimeout(() => {
-                    transitionWithNext("lose", () => {
-                        isGameOver = true;
+            // 격발(발사/불발) 처리 함수
+            const executeShot = () => {
+                if (chambers[currentIndex - 1]) {
+                    playAudio('bang');
+                    triggerScreenShake();
+                    
+                    setTimeout(() => {
+                        transitionWithNext("lose", () => {
+                            isGameOver = true;
+                            isProcessing = false;
+                        });
+                    }, 600);
+                } else {
+                    playAudio('hammer');
+                    
+                    setTimeout(() => {
+                        setScreenState("idle");
+                        isMyTurn = true;
                         isProcessing = false;
-                    });
-                }, 600);
+                    }, 200);
+                }
+            };
+
+            // 6번째 턴(마지막 턴)인 경우 finish 전환 후 0.5초 대기 후 격발
+            if (currentIndex === 6) {
+                setScreenState("finish");
+                setTimeout(executeShot, 500);
             } else {
-                playAudio('hammer');
-                
-                setTimeout(() => {
-                    setScreenState("idle");
-                    isMyTurn = true;
-                    isProcessing = false;
-                }, 200);
+                executeShot();
             }
         }, randomDelay);
     }
