@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>러시안 룰렛</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            user-select: none;
+        }
+
+        .bg-display {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            cursor: pointer;
+        }
+
+        .shake {
+            animation: extreme-vertical-shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes extreme-vertical-shake {
+            10%, 90% { transform: translate3d(0, -60px, 0); }
+            20%, 80% { transform: translate3d(0, 80px, 0); }
+            30%, 50%, 70% { transform: translate3d(0, -100px, 0); }
+            40%, 60% { transform: translate3d(0, 100px, 0); }
+        }
+
+        .bullets-box {
+            position: fixed;
+            left: 13vw;
+            bottom: 15px;
+            display: flex;
+            padding: 0;
+            background: none;
+            backdrop-filter: none;
+            cursor: pointer;
+            z-index: 99999;
+            transform: scale(1.2);
+            transform-origin: bottom left;
+            transition: opacity 0.1s ease;
+        }
+
+        .bullets-box.shake {
+            animation: bullet-vertical-shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes bullet-vertical-shake {
+            10%, 90% { transform: scale(1.2) translate3d(0, -60px, 0); }
+            20%, 80% { transform: scale(1.2) translate3d(0, 80px, 0); }
+            30%, 50%, 70% { transform: scale(1.2) translate3d(0, -100px, 0); }
+            40%, 60% { transform: scale(1.2) translate3d(0, 100px, 0); }
+        }
+
+        .bullet-img {
+            display: block;
+            opacity: 1 !important;
+        }
+
+        .revolver-btn {
+            position: fixed;
+            right: 0px;
+            bottom: 50px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            z-index: 999;
+        }
+
+        .revolver-btn:active {
+            transform: scale(0.95);
+        }
+
+        .revolver-btn img {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-display" id="bgDisplay"></div>
+
+<div class="bullets-box" id="bulletsBox" onclick="handleBulletClick(event)"></div>
+<div class="revolver-btn" id="revolverBtn" onclick="handleRevolverClick(event)">
+    <img id="revolverImg" src="" alt="리볼버">
+</div>
+
+<script>
+    const SOUND_PATHS = {
+        spin: "spin.mp3",
+        hammer: "hammer.mp3",
+        bang: "bang.mp3"
+    };
+
+    const IMAGE_PATHS = {
+        idle: "idle.png",
+        ready: "ready.png",
+        enemyTurn: "enemy_turn.png",
+        win: "win.png",
+        lose: "lose.png",
+        next: "next.png",
+        finish: "finish.png",
+        end: "end.png"
+    };
+
+    const REVOLVER_IMAGE_PATH = "revolver.png";
+    const BULLET_IMAGE_PATH = "bullet.png";
+
+    let chambers, bulletIndex, currentIndex, isMyTurn, isGameOver, isProcessing;
+    let isGameStarted = false;
+
+    function playAudio(type) {
+        const path = SOUND_PATHS[type];
+        if (path) {
+            const audio = new Audio(path);
+            audio.play().catch(e => console.log("Audio Error:", e));
+        }
+    }
+
+    function triggerScreenShake() {
+        const bg = document.getElementById("bgDisplay");
+        const bulletsBox = document.getElementById("bulletsBox");
+
+        bg.classList.remove("shake");
+        bulletsBox.classList.remove("shake");
+
+        void bg.offsetWidth;
+        void bulletsBox.offsetWidth;
+
+        bg.classList.add("shake");
+        bulletsBox.classList.add("shake");
+    }
+
+    function renderBullets() {
+        const bulletsBox = document.getElementById("bulletsBox");
+        bulletsBox.innerHTML = "";
+
+        const img = document.createElement("img");
+        img.src = BULLET_IMAGE_PATH;
+        img.className = "bullet-img";
+        bulletsBox.appendChild(img);
+    }
+
+    function setScreenState(stateKey) {
+        const bgDisplay = document.getElementById("bgDisplay");
+        const path = IMAGE_PATHS[stateKey];
+        if (path) {
+            bgDisplay.style.backgroundImage = `url('${path}')`;
+        }
+    }
+
+    function transitionWithNext(targetStateKey, callback) {
+        const bulletsBox = document.getElementById("bulletsBox");
+        bulletsBox.style.opacity = "0";
+        setScreenState("next");
+
+        setTimeout(() => {
+            setScreenState(targetStateKey);
+            bulletsBox.style.opacity = "1";
+            if (callback) callback();
+        }, 250);
+    }
+
+    function startGame() {
+        if (isGameStarted) return;
+        isGameStarted = true;
+        
+        chambers = [false, false, false, false, false, false];
+        bulletIndex = Math.floor(Math.random() * 6);
+        chambers[bulletIndex] = true;
+        currentIndex = 0;
+        isMyTurn = true;
+        isGameOver = false;
+        isProcessing = false;
+
+        document.getElementById("revolverImg").src = REVOLVER_IMAGE_PATH;
+
+        playAudio('spin');
+        renderBullets();
+        setScreenState("idle");
+
+        const bgDisplay = document.getElementById("bgDisplay");
+        bgDisplay.removeEventListener('click', startGame);
+        bgDisplay.removeEventListener('touchstart', startGame);
+    }
+
+    function initGame(playSound = true) {
+        chambers = [false, false, false, false, false, false];
+        bulletIndex = Math.floor(Math.random() * 6);
+        chambers[bulletIndex] = true;
+        currentIndex = 0;
+        isMyTurn = true;
+        isGameOver = false;
+        isProcessing = false;
+
+        document.getElementById("revolverImg").src = REVOLVER_IMAGE_PATH;
+
+        if (playSound) {
+            playAudio('spin');
+        }
+
+        renderBullets();
+        setScreenState("idle");
+    }
+
+    function handleRevolverClick(e) {
+        if (e) e.stopPropagation();
+        if (!isGameStarted) return;
+        if (isProcessing || isGameOver || !isMyTurn) return;
+        playerTurnProcess();
+    }
+
+    function handleBulletClick(e) {
+        if (e) e.stopPropagation();
+        if (!isGameStarted) return;
+        if (isGameOver && !isProcessing) {
+            initGame(true);
+        }
+    }
+
+    function playerTurnProcess() {
+        isProcessing = true;
+        setScreenState("ready");
+
+        setTimeout(() => {
+            currentIndex++;
+
+            if (chambers[currentIndex - 1]) {
+                playAudio('bang');
+                triggerScreenShake();
+                transitionWithNext("win", () => {
+                    setTimeout(() => {
+                        setScreenState("end");
+                        isGameOver = true;
+                        isProcessing = false;
+                    }, 1000);
+                });
+            } else {
+                playAudio('hammer');
+                
+                setTimeout(() => {
+                    setScreenState("enemyTurn");
+                    isMyTurn = false;
+                    aiTurnProcess();
+                }, 500);
+            }
+        }, 1000);
+    }
+
+    function aiTurnProcess() {
+        const randomDelay = Math.floor(Math.random() * 1000) + 1000;
+
+        setTimeout(() => {
+            if (currentIndex === 5) {
+                setScreenState("finish");
+            }
+
+            currentIndex++;
+
+            if (chambers[currentIndex - 1]) {
+                playAudio('bang');
+                triggerScreenShake();
+                
+                setTimeout(() => {
+                    transitionWithNext("lose", () => {
+                        isGameOver = true;
+                        isProcessing = false;
+                    });
+                }, 600);
+            } else {
+                playAudio('hammer');
+                
+                setTimeout(() => {
+                    setScreenState("idle");
+                    isMyTurn = true;
+                    isProcessing = false;
+                }, 200);
+            }
+        }, randomDelay);
+    }
+
+    document.getElementById("bulletsBox").style.opacity = "0";
+    setScreenState("next");
+    const bgDisplay = document.getElementById("bgDisplay");
+    bgDisplay.addEventListener('click', startGame);
+    bgDisplay.addEventListener('touchstart', startGame);
+</script>
+
+</body>
+</html>
